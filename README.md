@@ -20,17 +20,18 @@ NoCatalog 是一个面向 Android 的本地收藏记录应用，主要用于记�
 
 以下截图来自当前版本的真机界面：
 
-### 首页
-
-![首页](docs/img/img1.jpg)
-
-### 统计页
-
-![统计页](docs/img/img2.jpg)
-
-### 设置页
-
-![设置页](docs/img/img3.jpg)
+<table>
+  <tr>
+    <td align="center"><strong>首页</strong></td>
+    <td align="center"><strong>统计页</strong></td>
+    <td align="center"><strong>设置页</strong></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/img/img1.jpg" alt="首页" width="144" /></td>
+    <td align="center"><img src="docs/img/img2.jpg" alt="统计页" width="144" /></td>
+    <td align="center"><img src="docs/img/img3.jpg" alt="设置页" width="144" /></td>
+  </tr>
+</table>
 
 ## 技术方案
 

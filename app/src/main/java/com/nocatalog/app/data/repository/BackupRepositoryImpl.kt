@@ -14,10 +14,14 @@ import com.nocatalog.app.domain.model.BackupManifest
 import com.nocatalog.app.domain.model.BackupPayload
 import com.nocatalog.app.domain.model.BackupResult
 import com.nocatalog.app.domain.model.Entry
+import com.nocatalog.app.domain.model.EntryStatus
+import com.nocatalog.app.domain.model.Performer
 import com.nocatalog.app.domain.model.RemoteBackupFile
+import com.nocatalog.app.domain.model.Tag
 import com.nocatalog.app.domain.model.WebDavConfig
 import com.nocatalog.app.domain.repository.BackupRepository
 import com.nocatalog.app.domain.repository.EntryRepository
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
@@ -155,16 +159,38 @@ class BackupRepositoryImpl @Inject constructor(
             val rating = row.raw["rating"]?.toFloatOrNull() ?: return@mapNotNull null
             val now = DateTimeUtil.nowUtcIso()
             Entry(
-                id = row.raw["id"].orEmpty(),
+                id = row.raw["id"].orEmpty().ifBlank { UUID.randomUUID().toString() },
                 code = code,
                 title = title,
-                performers = emptyList(),
-                tags = emptyList(),
+                performers = row.raw["performers"].splitMultiValue().map {
+                    Performer(id = UUID.randomUUID().toString(), name = it)
+                },
+                tags = row.raw["tags"].splitMultiValue().map {
+                    Tag(id = UUID.randomUUID().toString(), name = it)
+                },
                 rating = rating,
+                notes = row.raw["notes"]?.takeIf { it.isNotBlank() },
+                status = row.raw["status"]?.let { runCatching { EntryStatus.valueOf(it) }.getOrDefault(EntryStatus.COLLECTED) }
+                    ?: EntryStatus.COLLECTED,
+                favorite = row.raw["favorite"]?.toBooleanStrictOrNull() ?: false,
+                watched = row.raw["watched"]?.toBooleanStrictOrNull() ?: false,
+                releaseDate = row.raw["release_date"]?.takeIf { it.isNotBlank() },
                 collectedAt = row.raw["collected_at"] ?: now,
+                sourceUrl = row.raw["source_url"]?.takeIf { it.isNotBlank() },
+                coverLocalPath = row.raw["cover_local_path"]?.takeIf { it.isNotBlank() },
+                coverThumbPath = row.raw["cover_thumb_path"]?.takeIf { it.isNotBlank() },
+                coverRemoteUrl = row.raw["cover_remote_url"]?.takeIf { it.isNotBlank() },
+                coverUpdatedAt = row.raw["cover_updated_at"]?.takeIf { it.isNotBlank() },
                 createdAt = row.raw["created_at"] ?: now,
                 updatedAt = row.raw["updated_at"] ?: now,
             )
         }
+    }
+
+    private fun String?.splitMultiValue(): List<String> {
+        return this.orEmpty()
+            .split("|")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
     }
 }

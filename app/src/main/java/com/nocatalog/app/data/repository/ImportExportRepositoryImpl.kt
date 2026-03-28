@@ -172,7 +172,9 @@ class ImportExportRepositoryImpl @Inject constructor(
             collectedAt = row.raw["collected_at"]?.takeIf { it.isNotBlank() } ?: now,
             sourceUrl = row.raw["source_url"]?.takeIf { it.isNotBlank() },
             coverLocalPath = row.raw["cover_local_path"]?.takeIf { it.isNotBlank() },
+            coverThumbPath = row.raw["cover_thumb_path"]?.takeIf { it.isNotBlank() },
             coverRemoteUrl = row.raw["cover_remote_url"]?.takeIf { it.isNotBlank() },
+            coverUpdatedAt = row.raw["cover_updated_at"]?.takeIf { it.isNotBlank() },
             createdAt = row.raw["created_at"]?.takeIf { it.isNotBlank() } ?: now,
             updatedAt = row.raw["updated_at"]?.takeIf { it.isNotBlank() } ?: now,
         )
@@ -250,7 +252,9 @@ class ImportExportRepositoryImpl @Inject constructor(
             "collected_at" to entry.collectedAt,
             "source_url" to entry.sourceUrl.orEmpty(),
             "cover_local_path" to entry.coverLocalPath.orEmpty(),
+            "cover_thumb_path" to entry.coverThumbPath.orEmpty(),
             "cover_remote_url" to entry.coverRemoteUrl.orEmpty(),
+            "cover_updated_at" to entry.coverUpdatedAt.orEmpty(),
             "created_at" to entry.createdAt,
             "updated_at" to entry.updatedAt,
         )

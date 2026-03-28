@@ -30,10 +30,23 @@ data class EntryEntity(
     @ColumnInfo(name = "collected_at") val collectedAt: String,
     @ColumnInfo(name = "source_url") val sourceUrl: String?,
     @ColumnInfo(name = "cover_local_path") val coverLocalPath: String?,
+    @ColumnInfo(name = "cover_thumb_path") val coverThumbPath: String?,
     @ColumnInfo(name = "cover_remote_url") val coverRemoteUrl: String?,
+    @ColumnInfo(name = "cover_updated_at") val coverUpdatedAt: String?,
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "updated_at") val updatedAt: String,
     @ColumnInfo(name = "deleted_at") val deletedAt: String? = null,
+)
+
+data class NameCountEntity(
+    val id: String,
+    val name: String,
+    val count: Int,
+)
+
+data class StatusCountEntity(
+    val status: String,
+    val count: Int,
 )
 
 @Entity(

@@ -16,7 +16,9 @@ object CsvSchema {
         "collected_at",
         "source_url",
         "cover_local_path",
+        "cover_thumb_path",
         "cover_remote_url",
+        "cover_updated_at",
         "created_at",
         "updated_at",
     )
@@ -27,4 +29,3 @@ object CsvSchema {
         "releaseDate" to "release_date",
     )
 }
-

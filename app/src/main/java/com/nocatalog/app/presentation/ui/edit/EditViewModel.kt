@@ -1,8 +1,10 @@
 package com.nocatalog.app.presentation.ui.edit
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nocatalog.app.core.image.ImageStorageManager
 import com.nocatalog.app.core.util.DateTimeUtil
 import com.nocatalog.app.domain.model.Entry
 import com.nocatalog.app.domain.model.EntryStatus
@@ -36,7 +38,10 @@ data class EditUiState(
     val favorite: Boolean = false,
     val releaseDate: String = "",
     val sourceUrl: String = "",
+    val coverLocalPath: String = "",
+    val coverThumbPath: String = "",
     val coverRemoteUrl: String = "",
+    val coverUpdatedAt: String = "",
     val collectedAt: String = "",
     val createdAt: String = "",
     val errorMessage: String? = null,
@@ -49,12 +54,16 @@ class EditViewModel @Inject constructor(
     private val addEntryUseCase: AddEntryUseCase,
     private val updateEntryUseCase: UpdateEntryUseCase,
     private val getEntryDetailUseCase: GetEntryDetailUseCase,
+    private val imageStorageManager: ImageStorageManager,
 ) : ViewModel() {
 
     private val mutableState = MutableStateFlow(EditUiState())
     val uiState: StateFlow<EditUiState> = mutableState.asStateFlow()
 
     private val entryIdArg: String? = savedStateHandle["entryId"]
+    private val workingEntryId: String = entryIdArg
+        ?.takeIf { it.isNotBlank() && it != "new" }
+        ?: UUID.randomUUID().toString()
 
     init {
         if (!entryIdArg.isNullOrBlank() && entryIdArg != "new") {
@@ -70,6 +79,7 @@ class EditViewModel @Inject constructor(
     fun onNotesChange(value: String) = update { it.copy(notes = value) }
     fun onReleaseDateChange(value: String) = update { it.copy(releaseDate = value) }
     fun onSourceUrlChange(value: String) = update { it.copy(sourceUrl = value) }
+    fun onCoverLocalPathChange(value: String) = update { it.copy(coverLocalPath = value) }
     fun onCoverRemoteUrlChange(value: String) = update { it.copy(coverRemoteUrl = value) }
     fun onToggleWatched() = update { it.copy(watched = !it.watched) }
     fun onToggleFavorite() = update { it.copy(favorite = !it.favorite) }
@@ -94,7 +104,7 @@ class EditViewModel @Inject constructor(
         viewModelScope.launch {
             val now = DateTimeUtil.nowUtcIso()
             val entry = Entry(
-                id = state.entryId ?: UUID.randomUUID().toString(),
+                id = state.entryId ?: workingEntryId,
                 code = state.code,
                 title = state.title,
                 performers = state.performersText.splitInput().map {
@@ -111,8 +121,10 @@ class EditViewModel @Inject constructor(
                 releaseDate = state.releaseDate.ifBlank { null },
                 collectedAt = state.collectedAt.ifBlank { now },
                 sourceUrl = state.sourceUrl.ifBlank { null },
-                coverLocalPath = null,
+                coverLocalPath = state.coverLocalPath.ifBlank { null },
+                coverThumbPath = state.coverThumbPath.ifBlank { null },
                 coverRemoteUrl = state.coverRemoteUrl.ifBlank { null },
+                coverUpdatedAt = state.coverUpdatedAt.ifBlank { null },
                 createdAt = state.createdAt.ifBlank { now },
                 updatedAt = now,
             )
@@ -122,6 +134,27 @@ class EditViewModel @Inject constructor(
                 addEntryUseCase(entry)
             }
             update { it.copy(saveCompleted = true) }
+        }
+    }
+
+    fun importLocalCover(uri: Uri) {
+        viewModelScope.launch {
+            when (val result = imageStorageManager.importCoverFromUri(uri, uiState.value.entryId ?: workingEntryId)) {
+                is com.nocatalog.app.core.common.AppResult.Error -> {
+                    update { it.copy(errorMessage = result.error.toReadableMessage()) }
+                }
+                is com.nocatalog.app.core.common.AppResult.Success -> {
+                    update {
+                        it.copy(
+                            entryId = it.entryId ?: workingEntryId,
+                            coverLocalPath = result.data.localPath,
+                            coverThumbPath = result.data.thumbPath,
+                            coverUpdatedAt = DateTimeUtil.nowUtcIso(),
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -149,7 +182,10 @@ class EditViewModel @Inject constructor(
                     favorite = entry.favorite,
                     releaseDate = entry.releaseDate.orEmpty(),
                     sourceUrl = entry.sourceUrl.orEmpty(),
+                    coverLocalPath = entry.coverLocalPath.orEmpty(),
+                    coverThumbPath = entry.coverThumbPath.orEmpty(),
                     coverRemoteUrl = entry.coverRemoteUrl.orEmpty(),
+                    coverUpdatedAt = entry.coverUpdatedAt.orEmpty(),
                     collectedAt = entry.collectedAt,
                     createdAt = entry.createdAt,
                 )
@@ -165,5 +201,15 @@ class EditViewModel @Inject constructor(
         return split(",", "，", "|")
             .map { it.trim() }
             .filter { it.isNotBlank() }
+    }
+
+    private fun com.nocatalog.app.core.common.AppError.toReadableMessage(): String {
+        return when (this) {
+            is com.nocatalog.app.core.common.AppError.Network -> message
+            is com.nocatalog.app.core.common.AppError.Security -> message
+            is com.nocatalog.app.core.common.AppError.Storage -> message
+            is com.nocatalog.app.core.common.AppError.Validation -> message
+            is com.nocatalog.app.core.common.AppError.Unknown -> message
+        }
     }
 }

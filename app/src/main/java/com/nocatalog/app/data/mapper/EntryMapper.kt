@@ -29,7 +29,9 @@ class EntryMapper @Inject constructor() {
             collectedAt = source.entry.collectedAt,
             sourceUrl = source.entry.sourceUrl,
             coverLocalPath = source.entry.coverLocalPath,
+            coverThumbPath = source.entry.coverThumbPath,
             coverRemoteUrl = source.entry.coverRemoteUrl,
+            coverUpdatedAt = source.entry.coverUpdatedAt,
             createdAt = source.entry.createdAt,
             updatedAt = source.entry.updatedAt,
         )
@@ -49,11 +51,12 @@ class EntryMapper @Inject constructor() {
             collectedAt = entry.collectedAt,
             sourceUrl = entry.sourceUrl,
             coverLocalPath = entry.coverLocalPath,
+            coverThumbPath = entry.coverThumbPath,
             coverRemoteUrl = entry.coverRemoteUrl,
+            coverUpdatedAt = entry.coverUpdatedAt,
             createdAt = entry.createdAt,
             updatedAt = entry.updatedAt,
             deletedAt = null,
         )
     }
 }
-

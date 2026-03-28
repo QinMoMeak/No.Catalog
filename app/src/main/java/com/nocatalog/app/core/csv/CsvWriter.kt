@@ -29,7 +29,9 @@ class CsvWriter @Inject constructor() {
                     entry.collectedAt,
                     entry.sourceUrl.orEmpty(),
                     entry.coverLocalPath.orEmpty(),
+                    entry.coverThumbPath.orEmpty(),
                     entry.coverRemoteUrl.orEmpty(),
+                    entry.coverUpdatedAt.orEmpty(),
                     entry.createdAt,
                     entry.updatedAt,
                 ).joinToString(",") { it.escapeCsvCell() },
@@ -39,4 +41,3 @@ class CsvWriter @Inject constructor() {
             builder.toString().encodeToByteArray()
     }
 }
-

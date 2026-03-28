@@ -18,7 +18,9 @@ data class Entry(
     val collectedAt: String,
     val sourceUrl: String? = null,
     val coverLocalPath: String? = null,
+    val coverThumbPath: String? = null,
     val coverRemoteUrl: String? = null,
+    val coverUpdatedAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
 )
@@ -42,4 +44,3 @@ enum class EntryStatus {
     WATCHED,
     ARCHIVED,
 }
-

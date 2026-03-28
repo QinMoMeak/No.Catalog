@@ -4,10 +4,10 @@ data class EntryFilter(
     val statuses: Set<EntryStatus> = emptySet(),
     val watched: Boolean? = null,
     val favorite: Boolean? = null,
+    val performerIds: Set<String> = emptySet(),
+    val tagIds: Set<String> = emptySet(),
     val minRating: Float? = null,
     val maxRating: Float? = null,
-    val performer: String? = null,
-    val tag: String? = null,
 )
 
 enum class EntrySort {
@@ -31,3 +31,26 @@ data class UserSettings(
     val webDavConfig: WebDavConfig? = null,
 )
 
+data class StatisticsSummary(
+    val totalCount: Int,
+    val watchedCount: Int,
+    val unwatchedCount: Int,
+    val favoriteCount: Int,
+    val averageRating: Float,
+    val statusCounts: List<StatusCount>,
+    val topTags: List<NameCount>,
+    val topPerformers: List<NameCount>,
+    val addedIn7Days: Int,
+    val addedIn30Days: Int,
+)
+
+data class StatusCount(
+    val status: EntryStatus,
+    val count: Int,
+)
+
+data class NameCount(
+    val id: String,
+    val name: String,
+    val count: Int,
+)

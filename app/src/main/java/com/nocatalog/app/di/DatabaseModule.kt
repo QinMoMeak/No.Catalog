@@ -6,6 +6,7 @@ import com.nocatalog.app.core.common.Constants
 import com.nocatalog.app.data.local.dao.EntryDao
 import com.nocatalog.app.data.local.dao.EntryRelationDao
 import com.nocatalog.app.data.local.dao.PerformerDao
+import com.nocatalog.app.data.local.dao.StatisticsDao
 import com.nocatalog.app.data.local.dao.TagDao
 import com.nocatalog.app.data.local.db.AppDatabase
 import dagger.Module
@@ -26,7 +27,8 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             Constants.DATABASE_NAME,
-        ).build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
@@ -40,5 +42,7 @@ object DatabaseModule {
 
     @Provides
     fun provideEntryRelationDao(database: AppDatabase): EntryRelationDao = database.entryRelationDao()
-}
 
+    @Provides
+    fun provideStatisticsDao(database: AppDatabase): StatisticsDao = database.statisticsDao()
+}

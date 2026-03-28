@@ -1,8 +1,8 @@
-# 安卓收藏管理 App ——**NoCatalog**实施文档（可直接交给 Codex）
+# 安卓收藏管理 App 实施文档（可直接交给 Codex）
 
 ## 1. 项目目标
 
-开发一个 Android App，名称为**NoCatalog** 包名com.nocatalog.app用于快捷录入、查看、搜索和管理个人收藏记录。应用定位为“接近 Excel 的本地结构化管理工具”，但交互上更适合手机使用。
+开发一个 Android App，用于快捷录入、查看、搜索和管理个人收藏记录。应用定位为“接近 Excel 的本地结构化管理工具”，但交互上更适合手机使用。
 
 ### 已确认需求
 - 数据规模：几千条
@@ -1025,17 +1025,347 @@ enum class ImportRowStatus {
 
 ---
 
-## 26. 最终结论
+## 26. 本轮变更需求（增量实施）
 
-这是一个“本地优先 + 可迁移”的 Android 结构化收藏管理应用。
+基于当前已完成状态与工作日志，新增以下迭代需求：工作日志显示当前工程已完成本地 CRUD、导入导出、WebDAV 手动备份恢复、锁屏会话和基础筛选，并已多次成功构建 debug 包，可在现有工程上直接增量开发。fileciteturn0file0
 
-本方案已经按你的约束收敛为：
-- 几千条数据规模可稳定运行
-- 当前阶段通过 WebDAV 手动备份/恢复满足多设备迁移需求
-- CSV 面向人工编辑，JSON 面向系统迁移
-- 数据库结构兼容未来网站导入
-- UI 同时支持表格和卡片视图
-- 具备密码锁隐私保护
+### 26.1 封面增强
 
-该文档已可直接交给 Codex 用于搭建项目骨架与核心模块。
+#### 新需求
+1. 除网络 `coverRemoteUrl` 外，增加本地图片上传能力
+2. 对有封面的记录，在首页卡片视图、详情页、编辑页中展示封面缩略图
+3. 导入本地图片后自动压缩和优化尺寸，避免原图过大导致存储膨胀和列表卡顿
+
+#### 数据模型调整
+`entries` 表保留并强化以下字段：
+- `cover_local_path TEXT`
+- `cover_remote_url TEXT`
+- `cover_thumb_path TEXT`（新增，保存压缩后缩略图路径，推荐新增）
+- `cover_updated_at TEXT`（新增，可选，用于封面更新时间）
+
+推荐 SQL 增量迁移：
+
+```sql
+ALTER TABLE entries ADD COLUMN cover_thumb_path TEXT;
+ALTER TABLE entries ADD COLUMN cover_updated_at TEXT;
+```
+
+#### 实现要求
+- 编辑页新增“选择本地图片”入口
+- 使用系统文件选择器选择图片
+- 将原图复制到 App 私有目录，例如：
+  - `/files/covers/original/`
+  - `/files/covers/thumbs/`
+- 自动生成两份：
+  1. 原图压缩版（最长边限制，例如 1600px）
+  2. 列表缩略图（例如宽 320px）
+- 优先展示 `cover_thumb_path`
+- 详情页点击封面可查看大图（V1 可先做简单预览）
+- 删除记录时同步删除封面文件
+- 更换封面时删除旧封面文件，避免垃圾文件堆积
+
+#### 推荐实现类
+```text
+core/image/
+  ImageCompressor.kt
+  ImageStorageManager.kt
+  ImagePickerHandler.kt
+```
+
+#### 推荐接口
+```kotlin
+interface ImageStorageManager {
+    suspend fun importCoverFromUri(sourceUri: Uri, entryId: String): Result<CoverImageResult>
+    suspend fun deleteCoverFiles(entryId: String): Result<Unit>
+}
+
+data class CoverImageResult(
+    val localPath: String,
+    val thumbPath: String,
+    val width: Int,
+    val height: Int,
+    val sizeBytes: Long,
+)
+```
+
+#### 图片压缩建议
+- 解码前先读取尺寸
+- 按目标尺寸采样压缩
+- JPEG/WebP 有损压缩质量建议 80~88
+- 避免在主线程处理图片
+- 列表中使用 Coil 加载缩略图
+
+---
+
+### 26.2 增强筛选：标签筛选 + 演员筛选
+
+#### 新需求
+在现有状态筛选、星标筛选、已看筛选基础上，新增：
+- 标签筛选
+- 演员筛选
+
+#### 数据层要求
+由于项目已使用规范化表结构（`performers`、`tags`、交叉表），应直接基于关联表实现筛选，不要回退为字符串 contains。 
+
+#### Domain 模型调整
+扩展 `EntryFilter`：
+
+```kotlin
+data class EntryFilter(
+    val statuses: Set<EntryStatus> = emptySet(),
+    val favorite: Boolean? = null,
+    val watched: Boolean? = null,
+    val performerIds: Set<String> = emptySet(),
+    val tagIds: Set<String> = emptySet(),
+    val ratingMin: Float? = null,
+    val ratingMax: Float? = null,
+)
+```
+
+#### Repository / DAO 要求
+- 提供查询全部标签列表接口
+- 提供查询全部演员列表接口
+- 支持多选筛选
+- 推荐语义：
+  - 选中多个标签：默认“任一命中”
+  - 选中多个演员：默认“任一命中”
+- 如后续需要，可扩展为“同时命中全部”模式
+
+#### UI 要求
+首页新增筛选面板，支持：
+- 状态多选
+- 星标
+- 已看
+- 标签多选
+- 演员多选
+- 清空筛选
+
+可先使用底部弹窗或全屏筛选页实现。
+
+---
+
+### 26.3 增加统计模块
+
+#### 新需求
+新增“统计”模块，作为底部导航一级页面。
+
+#### 统计页首版内容
+1. 总记录数
+2. 已看数量
+3. 未看数量
+4. 星标数量
+5. 平均评分
+6. 按状态统计
+7. 按标签 Top N
+8. 按演员 Top N
+9. 最近新增数量（近 7 天 / 30 天）
+
+#### Domain 模型建议
+```kotlin
+data class StatisticsSummary(
+    val totalCount: Int,
+    val watchedCount: Int,
+    val unwatchedCount: Int,
+    val favoriteCount: Int,
+    val averageRating: Float,
+    val statusCounts: List<StatusCount>,
+    val topTags: List<NameCount>,
+    val topPerformers: List<NameCount>,
+    val addedIn7Days: Int,
+    val addedIn30Days: Int,
+)
+
+data class StatusCount(
+    val status: EntryStatus,
+    val count: Int,
+)
+
+data class NameCount(
+    val id: String,
+    val name: String,
+    val count: Int,
+)
+```
+
+#### DAO 建议
+新增 `StatisticsDao` 或在 `EntryRelationDao` 中补充聚合查询：
+- `getTotalCount()`
+- `getWatchedCount()`
+- `getFavoriteCount()`
+- `getAverageRating()`
+- `getStatusCounts()`
+- `getTopTags(limit: Int)`
+- `getTopPerformers(limit: Int)`
+- `getAddedCountSince(date: String)`
+
+#### UI 要求
+统计页可使用以下 Compose 组件：
+- 顶部概览卡片
+- 分类统计卡片
+- Top 标签列表
+- Top 演员列表
+- 简单条形图或进度条（V1 可先用文本 + LinearProgressIndicator）
+
+首版不强制引入图表库，优先保证稳定和信息清晰。
+
+---
+
+### 26.4 UI 改造：底部导航栏
+
+#### 新需求
+将主界面调整为底部导航三大块：
+- 首页
+- 统计
+- 设置
+
+#### 导航结构建议
+```text
+MainScaffold
+  BottomBar
+    Home
+    Stats
+    Settings
+```
+
+二级页面：
+- 详情页
+- 编辑页
+- 导入导出页
+- 备份页
+- 锁屏页
+- 导入预览页
+
+#### 路由建议
+```kotlin
+object Routes {
+    const val Lock = "lock"
+    const val Home = "home"
+    const val Stats = "stats"
+    const val Settings = "settings"
+    const val Detail = "detail/{entryId}"
+    const val Edit = "edit?entryId={entryId}"
+    const val ImportExport = "import_export"
+    const val ImportPreview = "import_preview"
+    const val Backup = "backup"
+}
+```
+
+#### 实现要求
+- 首页、统计、设置作为底部一级路由
+- 二级页面不显示底部栏，或按需隐藏
+- 当前选中项高亮
+- 底部栏使用 `NavigationBar`
+- 保留首页顶部搜索和筛选入口
+
+---
+
+## 27. 数据库迁移要求
+
+本轮需求需要新增字段，必须补充 Room Migration。
+
+### Migration 方向
+- `entries` 新增 `cover_thumb_path`
+- `entries` 新增 `cover_updated_at`
+- 如当前未落地 `cover_local_path` 字段，则一并补上
+
+示例：
+
+```kotlin
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE entries ADD COLUMN cover_thumb_path TEXT")
+        database.execSQL("ALTER TABLE entries ADD COLUMN cover_updated_at TEXT")
+    }
+}
+```
+
+同时：
+- 升级 `schemaVersion`
+- 更新 JSON 备份结构
+- 更新 CSV 导入导出映射（若要加入 `cover_thumb_path` 可选列）
+
+---
+
+## 28. 需要同步修改的模块清单
+
+### Data 层
+- `EntryEntity`
+- `AppDatabase` migration
+- `EntryDao` / `EntryRelationDao`
+- `StatisticsDao`（新增）
+- `EntryRepositoryImpl`
+- `ImportExportRepositoryImpl`
+
+### Domain 层
+- `Entry`
+- `EntryFilter`
+- `StatisticsSummary`（新增）
+- `GetStatisticsUseCase`（新增）
+
+### Presentation 层
+- 首页筛选 UI
+- 首页卡片/表格增加封面展示
+- 统计页新增
+- 设置页迁移到底部一级入口
+- 主导航改为底部导航结构
+- 编辑页增加本地图片选择
+
+### Core 层
+- `ImageCompressor`
+- `ImageStorageManager`
+- `ImagePickerHandler`
+
+---
+
+## 29. 给 Codex 的增量开发指令
+
+```text
+请在现有 Android 项目基础上继续增量开发，不要重构已有主架构。
+
+本轮新增需求：
+1. 封面支持本地图片上传
+   - 编辑页增加从系统选择器导入本地图片
+   - 将图片复制到 App 私有目录
+   - 自动压缩原图并生成缩略图
+   - entries 表新增 cover_thumb_path、cover_updated_at
+   - 首页卡片视图、表格视图、详情页展示封面；优先加载缩略图
+   - 删除或替换封面时清理旧文件
+2. 首页筛选增强
+   - 在现有状态/星标/已看筛选基础上，新增标签筛选和演员筛选
+   - 支持多选
+   - 默认语义为“任一命中”
+3. 新增统计模块
+   - 作为底部导航一级页面
+   - 展示：总数、已看、未看、星标、平均评分、按状态统计、Top 标签、Top 演员、近 7/30 天新增数
+   - 优先使用 Room 聚合查询，不引入重型图表库
+4. 主 UI 改造
+   - 增加底部导航栏：首页、统计、设置
+   - 详情、编辑、导入导出、备份等作为二级页面
+
+实现要求：
+- 使用 Room Migration 处理数据库升级
+- 保持 UTF-8 编码
+- 保持 Kotlin + Compose + MVVM + Hilt + Room 架构不变
+- 优先交付可运行版本
+- 所有新增关键类写中文注释
+
+请优先输出：
+1. 需要修改的目录和文件列表
+2. Room migration 和 entity 更新
+3. 统计 DAO / repository / usecase
+4. 底部导航改造
+5. 本地图片导入与压缩骨架
+6. 首页筛选 UI 和 ViewModel 更新
+7. 最后确保 assembleDebug 可通过
+```
+
+---
+
+## 30. 最终说明
+
+这四项需求都适合在当前代码基线上增量实现，不需要推翻原有架构。根据工作日志，现有版本已经具备较完整的功能闭环和稳定构建基础，因此本轮重点是：
+- 补充媒体资源管理（本地封面）
+- 扩展关联筛选（标签/演员）
+- 增加聚合统计
+- 把导航升级为更完整的三段式主框架。fileciteturn0file0
 

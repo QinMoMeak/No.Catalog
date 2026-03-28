@@ -139,8 +139,9 @@ object NetworkModule {
 
                         XmlPullParser.END_TAG -> {
                             val tag = parser.name.substringAfter(':')
-                            if (tag == "response" && href != null) {
-                                val normalizedPath = decodeHref(href!!)
+                            val currentHref = href
+                            if (tag == "response" && currentHref != null) {
+                                val normalizedPath = decodeHref(currentHref)
                                 val cleanedBase = "/${path.trim('/')}/"
                                 if (!normalizedPath.trimEnd('/').endsWith(cleanedBase.trimEnd('/'))) {
                                     val name = normalizedPath.trimEnd('/').substringAfterLast('/')

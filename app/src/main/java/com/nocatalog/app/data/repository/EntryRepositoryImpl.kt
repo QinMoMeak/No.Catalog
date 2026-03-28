@@ -3,6 +3,7 @@ package com.nocatalog.app.data.repository
 import androidx.room.withTransaction
 import com.nocatalog.app.core.common.AppDispatchers
 import com.nocatalog.app.core.common.normalizeToken
+import com.nocatalog.app.core.image.ImageStorageManager
 import com.nocatalog.app.core.util.DateTimeUtil
 import com.nocatalog.app.data.local.dao.EntryDao
 import com.nocatalog.app.data.local.dao.EntryRelationDao
@@ -17,6 +18,8 @@ import com.nocatalog.app.data.mapper.EntryMapper
 import com.nocatalog.app.domain.model.Entry
 import com.nocatalog.app.domain.model.EntryFilter
 import com.nocatalog.app.domain.model.EntrySort
+import com.nocatalog.app.domain.model.Performer
+import com.nocatalog.app.domain.model.Tag
 import com.nocatalog.app.domain.repository.EntryRepository
 import java.util.UUID
 import javax.inject.Inject
@@ -35,6 +38,7 @@ class EntryRepositoryImpl @Inject constructor(
     private val tagDao: TagDao,
     private val relationDao: EntryRelationDao,
     private val mapper: EntryMapper,
+    private val imageStorageManager: ImageStorageManager,
     private val dispatchers: AppDispatchers,
 ) : EntryRepository {
 
@@ -48,6 +52,18 @@ class EntryRepositoryImpl @Inject constructor(
         entryDao.getById(id)?.let(mapper::toDomain)
     }
 
+    override fun observePerformers(): Flow<List<Performer>> {
+        return performerDao.observeAll()
+            .map { list -> list.map { Performer(id = it.id, name = it.name) } }
+            .flowOn(dispatchers.io)
+    }
+
+    override fun observeTags(): Flow<List<Tag>> {
+        return tagDao.observeAll()
+            .map { list -> list.map { Tag(id = it.id, name = it.name) } }
+            .flowOn(dispatchers.io)
+    }
+
     override suspend fun addEntry(entry: Entry) {
         upsertGraph(entry)
     }
@@ -59,6 +75,8 @@ class EntryRepositoryImpl @Inject constructor(
     override suspend fun deleteEntry(id: String) = withContext(dispatchers.io) {
         val now = DateTimeUtil.nowUtcIso()
         entryDao.softDelete(id = id, deletedAt = now, updatedAt = now)
+        imageStorageManager.deleteCoverFiles(id)
+        Unit
     }
 
     override suspend fun search(
@@ -154,8 +172,8 @@ class EntryRepositoryImpl @Inject constructor(
         if (filter.favorite != null && entry.favorite != filter.favorite) return false
         if (filter.minRating != null && entry.rating < filter.minRating) return false
         if (filter.maxRating != null && entry.rating > filter.maxRating) return false
-        if (!filter.performer.isNullOrBlank() && entry.performers.none { it.name.contains(filter.performer, true) }) return false
-        if (!filter.tag.isNullOrBlank() && entry.tags.none { it.name.contains(filter.tag, true) }) return false
+        if (filter.performerIds.isNotEmpty() && entry.performers.none { it.id in filter.performerIds }) return false
+        if (filter.tagIds.isNotEmpty() && entry.tags.none { it.id in filter.tagIds }) return false
         return true
     }
 
@@ -170,4 +188,3 @@ class EntryRepositoryImpl @Inject constructor(
         }
     }
 }
-

@@ -26,8 +26,17 @@ data class HomeUiState(
     val statusFilter: EntryStatus? = null,
     val favoriteOnly: Boolean = false,
     val watchedOnly: Boolean = false,
+    val availableTags: List<FilterOptionUi> = emptyList(),
+    val availablePerformers: List<FilterOptionUi> = emptyList(),
+    val selectedTagIds: Set<String> = emptySet(),
+    val selectedPerformerIds: Set<String> = emptySet(),
     val entries: List<Entry> = emptyList(),
 ) : UiState
+
+data class FilterOptionUi(
+    val id: String,
+    val name: String,
+)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -39,7 +48,9 @@ class HomeViewModel @Inject constructor(
     private val statusFilter = MutableStateFlow<EntryStatus?>(null)
     private val favoriteOnly = MutableStateFlow(false)
     private val watchedOnly = MutableStateFlow(false)
-    private val filters = combine(
+    private val selectedTagIds = MutableStateFlow<Set<String>>(emptySet())
+    private val selectedPerformerIds = MutableStateFlow<Set<String>>(emptySet())
+    private val basicFilters = combine(
         query,
         statusFilter,
         favoriteOnly,
@@ -52,12 +63,22 @@ class HomeViewModel @Inject constructor(
             watchedOnly = watched,
         )
     }
+    private val relationFilters = combine(
+        selectedTagIds,
+        selectedPerformerIds,
+    ) { tags, performers ->
+        RelationFilterState(
+            selectedTagIds = tags,
+            selectedPerformerIds = performers,
+        )
+    }
 
     val uiState: StateFlow<HomeUiState> = combine(
         entryRepository.observeEntries(),
         settingsRepository.observeSettings(),
-        filters,
-    ) { entries, settings, filterState ->
+        basicFilters,
+        relationFilters,
+    ) { entries, settings, filterState, relationFilter ->
         val filtered = if (filterState.query.isBlank()) {
             entries
         } else {
@@ -74,6 +95,20 @@ class HomeViewModel @Inject constructor(
             .filter { entry -> filterState.status == null || entry.status == filterState.status }
             .filter { entry -> !filterState.favoriteOnly || entry.favorite }
             .filter { entry -> !filterState.watchedOnly || entry.watched }
+            .filter { entry ->
+                relationFilter.selectedTagIds.isEmpty() || entry.tags.any { tag -> tag.id in relationFilter.selectedTagIds }
+            }
+            .filter { entry ->
+                relationFilter.selectedPerformerIds.isEmpty() || entry.performers.any { performer -> performer.id in relationFilter.selectedPerformerIds }
+            }
+        val availableTags = entries.flatMap { entry -> entry.tags }
+            .distinctBy { tag -> tag.id }
+            .sortedBy { tag -> tag.name }
+            .map { tag -> FilterOptionUi(id = tag.id, name = tag.name) }
+        val availablePerformers = entries.flatMap { entry -> entry.performers }
+            .distinctBy { performer -> performer.id }
+            .sortedBy { performer -> performer.name }
+            .map { performer -> FilterOptionUi(id = performer.id, name = performer.name) }
         HomeUiState(
             query = filterState.query,
             viewMode = settings.homeViewMode,
@@ -81,6 +116,10 @@ class HomeViewModel @Inject constructor(
             statusFilter = filterState.status,
             favoriteOnly = filterState.favoriteOnly,
             watchedOnly = filterState.watchedOnly,
+            availableTags = availableTags,
+            availablePerformers = availablePerformers,
+            selectedTagIds = relationFilter.selectedTagIds,
+            selectedPerformerIds = relationFilter.selectedPerformerIds,
             entries = filtered.sortedWith(settings.defaultSort.comparator()),
         )
     }.stateIn(
@@ -138,6 +177,23 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onToggleTag(tagId: String) {
+        selectedTagIds.update { current ->
+            if (tagId in current) current - tagId else current + tagId
+        }
+    }
+
+    fun onTogglePerformer(performerId: String) {
+        selectedPerformerIds.update { current ->
+            if (performerId in current) current - performerId else current + performerId
+        }
+    }
+
+    fun onClearAdvancedFilters() {
+        selectedTagIds.update { emptySet() }
+        selectedPerformerIds.update { emptySet() }
+    }
+
     private fun EntrySort.comparator(): Comparator<Entry> {
         return when (this) {
             EntrySort.UPDATED_DESC -> compareByDescending<Entry> { it.updatedAt }
@@ -154,5 +210,10 @@ class HomeViewModel @Inject constructor(
         val status: EntryStatus?,
         val favoriteOnly: Boolean,
         val watchedOnly: Boolean,
+    )
+
+    private data class RelationFilterState(
+        val selectedTagIds: Set<String>,
+        val selectedPerformerIds: Set<String>,
     )
 }

@@ -5,11 +5,13 @@ import com.nocatalog.app.data.repository.EntryRepositoryImpl
 import com.nocatalog.app.data.repository.ImportExportRepositoryImpl
 import com.nocatalog.app.data.repository.SecurityRepositoryImpl
 import com.nocatalog.app.data.repository.SettingsRepositoryImpl
+import com.nocatalog.app.data.repository.StatisticsRepositoryImpl
 import com.nocatalog.app.domain.repository.BackupRepository
 import com.nocatalog.app.domain.repository.EntryRepository
 import com.nocatalog.app.domain.repository.ImportExportRepository
 import com.nocatalog.app.domain.repository.SecurityRepository
 import com.nocatalog.app.domain.repository.SettingsRepository
+import com.nocatalog.app.domain.repository.StatisticsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,5 +41,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSecurityRepository(impl: SecurityRepositoryImpl): SecurityRepository
-}
 
+    @Binds
+    @Singleton
+    abstract fun bindStatisticsRepository(impl: StatisticsRepositoryImpl): StatisticsRepository
+}

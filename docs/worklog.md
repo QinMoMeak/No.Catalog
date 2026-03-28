@@ -45,14 +45,40 @@
   - 星标筛选
   - 已看筛选
 - 最终再次执行 `.\gradlew.bat :app:assembleDebug --no-daemon`，确认完整功能版 debug 包构建通过。
+- 按规范第 26 条开始继续实施增量需求：
+  - 完成本地封面导入、压缩存储与缩略图字段接入
+  - 完成首页标签 / 演员高级筛选
+  - 完成统计页与底部导航（首页 / 统计 / 设置）
+  - 完成 Room `1 -> 2` 迁移，新增 `cover_thumb_path`、`cover_updated_at`
+  - 完成 CSV / JSON / 备份恢复对新增封面字段的适配
+- 修复第 26 条增量整合时出现的构建问题：
+  - 修正统计页 `EntryStatus` 引用
+  - 修正 Compose `weight` 的作用域使用方式
+  - 重新验证 Hilt / Room / 图片模块的依赖链
+  - 清理 `mapLatest`、迁移参数命名和 `!!` 相关 Kotlin 警告
+- 再次执行 `.\gradlew.bat :app:assembleDebug --no-daemon`，确认第 26 条后的增量版本构建通过。
+- 生成最新 debug 包：
+  - `app/build/outputs/apk/debug/app-debug.apk`
+  - 构建时间：2026-03-28 12:04:29
+- 阅读 `docs/ui-suggest.md` 并完成 UI 重构：
+  - 重建全局 Material 3 Theme、ColorScheme、Typography 与统一圆角
+  - 新增 `AppTopBar`、`SectionCard`、`EmptyCoverPlaceholder`、`StatCard`、`SettingGroupCard` 等通用组件
+  - 重构首页、统计页、设置页，并统一编辑页 / 详情页的分组与顶栏结构
+  - 保持现有业务流程和数据逻辑不变，仅调整 UI 与交互层
+- 再次执行 `.\gradlew.bat :app:assembleDebug --no-daemon`，确认 UI 重构后的 debug 包构建通过。
+- 生成 UI 重构后的最新 debug 包：
+  - `app/build/outputs/apk/debug/app-debug.apk`
+  - 构建时间：2026-03-28 13:00:49
 
 ### 进行中
 
-- 当前 V1 主要功能已落地，后续属于体验优化和更深入测试阶段。
+- 当前 V1 主要功能与第 26 条后的增强项已落地，后续属于体验优化和更深入测试阶段。
 
 ### 下一步
 
 - 增加单元测试、集成测试和 Compose UI 测试。
 - 优化 WebDAV PROPFIND 兼容性与异常提示。
 - 继续打磨导入冲突的逐条编辑与批量确认体验。
+- 处理当前构建警告：
+  - KAPT 仍提示 `room.schemaLocation` / `kapt.kotlin.generated` 选项未被处理器识别，需要后续统一整理注解处理配置
 - 继续保持所有新增与更新文件使用 UTF-8 编码。
